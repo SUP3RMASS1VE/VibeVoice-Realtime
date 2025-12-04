@@ -11,7 +11,7 @@ def main():
     os.environ["MODEL_PATH"] = args.model_path
     os.environ["MODEL_DEVICE"] = args.device
 
-    uvicorn.run("web.app:app", host="0.0.0.0", port=args.port, reload=args.reload)
+    uvicorn.run("web.app:app", reload=args.reload)
 
 if __name__ == "__main__":
     main()
