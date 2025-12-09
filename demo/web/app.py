@@ -363,11 +363,34 @@ def streaming_tts(text: str, **kwargs) -> Iterator[np.ndarray]:
 @app.websocket("/stream")
 async def websocket_stream(ws: WebSocket) -> None:
     await ws.accept()
+    
+    # Get text from query params (for short text) or wait for initial message (for long text)
     text = ws.query_params.get("text", "")
-    print(f"Client connected, text={text!r}")
     cfg_param = ws.query_params.get("cfg")
     steps_param = ws.query_params.get("steps")
     voice_param = ws.query_params.get("voice")
+    
+    # If no text in query params, wait for initial JSON message with text
+    if not text:
+        try:
+            init_msg = await asyncio.wait_for(ws.receive_text(), timeout=5.0)
+            init_data = json.loads(init_msg)
+            text = init_data.get("text", "")
+            # Allow overriding params from init message too
+            if "cfg" in init_data:
+                cfg_param = str(init_data["cfg"])
+            if "steps" in init_data:
+                steps_param = str(init_data["steps"])
+            if "voice" in init_data:
+                voice_param = init_data["voice"]
+        except asyncio.TimeoutError:
+            await ws.close(code=1008, reason="No text provided")
+            return
+        except json.JSONDecodeError:
+            await ws.close(code=1008, reason="Invalid JSON")
+            return
+    
+    print(f"Client connected, text length={len(text)}")
 
     try:
         cfg_scale = float(cfg_param) if cfg_param is not None else 1.5

@@ -918,8 +918,14 @@
     updateButtonLabel();
     createAudioChain();
 
+    // For long text, send via WebSocket message body to avoid URL length limits
+    const MAX_URL_TEXT_LENGTH = 1000;
+    const sendTextViaMessage = textValue.length > MAX_URL_TEXT_LENGTH;
+    
     const params = new URLSearchParams();
-    params.set('text', textValue);
+    if (!sendTextViaMessage) {
+      params.set('text', textValue);
+    }
     if (!Number.isNaN(cfgValue)) {
       params.set('cfg', cfgValue.toFixed(3));
     }
@@ -933,6 +939,18 @@
 
     socket = new WebSocket(wsUrl);
     socket.binaryType = 'arraybuffer';
+    
+    // For long text, send as initial message after connection opens
+    if (sendTextViaMessage) {
+      socket.onopen = () => {
+        socket.send(JSON.stringify({
+          text: textValue,
+          cfg: cfgValue,
+          steps: stepsValue,
+          voice: voiceValue
+        }));
+      };
+    }
 
     socket.onmessage = event => {
       if (typeof event.data === 'string') {
